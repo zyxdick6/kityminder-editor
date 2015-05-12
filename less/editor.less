@@ -1,6 +1,3 @@
-@import (less) "../lib/km-core/src/kityminder.css";
-@import (less) "../lib/hotbox/less/hotbox.less";
-
 .km-editor {
     overflow: hidden;
 }
@@ -55,3 +52,33 @@
         outline: none;
     }
 }
+
+
+.minder-editor {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 250px;
+    bottom: 0;
+}
+
+.control-panel {
+    position: absolute;
+    top: 0;
+    right: 0;
+    width: 250px;
+    bottom: 0;
+    border-left: 1px solid #CCC;
+}
+
+// @override bootstrap
+.panel-body {
+    padding: 10px;
+}
+
+@import (less) "_vars.less";
+@import (less) "_tool_group.less";
+@import (less) "_priority.less";
+@import (less) "_progress.less";
+@import (less) "_resource.less";
+@import (less) "_note.less";

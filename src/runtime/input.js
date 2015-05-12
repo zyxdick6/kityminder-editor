@@ -38,8 +38,11 @@ define(function(require, exports, module) {
             // when exited, commit or exit depends on the exit reason
             fsm.when('input -> *', function(exit, enter, reason) {
                 switch (reason) {
-                    case 'input-commit': return commitInputResult();
-                    case 'input-cancel': return exitInputMode();
+                    case 'input-cancel':
+                        return exitInputMode();
+                    case 'input-commit':
+                    default:
+                        return commitInputResult();
                 }
             });
 
@@ -135,7 +138,7 @@ define(function(require, exports, module) {
                     var box = focusNode.getRenderBox('TextRenderer');
                     receiverElement.style.left = Math.round(box.x) + 'px';
                     receiverElement.style.top = (debug.flaged ? Math.round(box.bottom + 30) : Math.round(box.y)) + 'px';
-                    receiverElement.focus();
+                    //receiverElement.focus();
                     planed.timer = 0;
                 });
             }
