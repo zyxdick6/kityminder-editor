@@ -1,6 +1,6 @@
 /*!
  * ====================================================
- * km-editor - v0.0.1 - 2015-01-22
+ * km-editor - v0.0.1 - 2015-05-12
  * https://github.com/fex-team/kityminder-editor
  * GitHub: https://github.com/fex-team/kityminder-editor 
  * Copyright (c) 2015 ; Licensed 
@@ -79,7 +79,7 @@ _p[0] = {
  */
 _p[1] = {
     value: function(require, exports, module) {
-        var kityminder = window.kityminder = _p.r(54);
+        var kityminder = window.kityminder = _p.r(55);
         return module.exports = kityminder.Editor = _p.r(0);
     }
 };
@@ -87,7 +87,7 @@ _p[1] = {
 //src/hotbox.js
 _p[2] = {
     value: function(require, exports, module) {
-        var HotBox = _p.r(18);
+        var HotBox = _p.r(19);
         return module.exports = HotBox;
     }
 };
@@ -100,7 +100,353 @@ _p[3] = {
 //src/minder.js
 _p[4] = {
     value: function(require, exports, module) {
-        return module.exports = _p.r(54).Minder;
+        var Minder = _p.r(55).Minder;
+        var KityMinder = window.KM = window.KityMinder = function() {
+            var instanceMap = {}, instanceId = 0, uuidMap = {};
+            return {
+                version: "1.3.5",
+                uuid: function(name) {
+                    name = name || "unknown";
+                    uuidMap[name] = uuidMap[name] || 0;
+                    ++uuidMap[name];
+                    return name + "_" + uuidMap[name];
+                },
+                createMinder: function(renderTarget, options) {
+                    options = options || {};
+                    options.renderTo = Utils.isString(renderTarget) ? document.getElementById(renderTarget) : renderTarget;
+                    var minder = new Minder(options);
+                    this.addMinder(options.renderTo, minder);
+                    return minder;
+                },
+                addMinder: function(target, minder) {
+                    var id;
+                    if (typeof target === "string") {
+                        id = target;
+                    } else {
+                        id = target.id || "KM_INSTANCE_" + instanceId++;
+                    }
+                    instanceMap[id] = minder;
+                },
+                getMinder: function(target, options) {
+                    var id;
+                    if (typeof target === "string") {
+                        id = target;
+                    } else {
+                        id = target.id || "KM_INSTANCE_" + instanceId++;
+                    }
+                    return instanceMap[id] || this.createMinder(target, options);
+                },
+                //挂接多语言
+                LANG: {}
+            };
+        }();
+        var utils = Utils = KityMinder.Utils = {
+            extend: kity.Utils.extend.bind(kity.Utils),
+            listen: function(element, type, handler) {
+                var types = utils.isArray(type) ? type : utils.trim(type).split(/\s+/), k = types.length;
+                if (k) while (k--) {
+                    type = types[k];
+                    if (element.addEventListener) {
+                        element.addEventListener(type, handler, false);
+                    } else {
+                        if (!handler._d) {
+                            handler._d = {
+                                els: []
+                            };
+                        }
+                        var key = type + handler.toString(), index = utils.indexOf(handler._d.els, element);
+                        if (!handler._d[key] || index == -1) {
+                            if (index == -1) {
+                                handler._d.els.push(element);
+                            }
+                            if (!handler._d[key]) {
+                                handler._d[key] = function(evt) {
+                                    return handler.call(evt.srcElement, evt || window.event);
+                                };
+                            }
+                            element.attachEvent("on" + type, handler._d[key]);
+                        }
+                    }
+                }
+                element = null;
+            },
+            trim: function(str) {
+                return str.replace(/(^[ \t\n\r]+)|([ \t\n\r]+$)/g, "");
+            },
+            each: function(obj, iterator, context) {
+                if (obj == null) return;
+                if (obj.length === +obj.length) {
+                    for (var i = 0, l = obj.length; i < l; i++) {
+                        if (iterator.call(context, i, obj[i], obj) === false) return false;
+                    }
+                } else {
+                    for (var key in obj) {
+                        if (obj.hasOwnProperty(key)) {
+                            if (iterator.call(context, key, obj[key], obj) === false) return false;
+                        }
+                    }
+                }
+            },
+            addCssRule: function(key, style, doc) {
+                var head, node;
+                if (style === undefined || style && style.nodeType && style.nodeType == 9) {
+                    //获取样式
+                    doc = style && style.nodeType && style.nodeType == 9 ? style : doc || document;
+                    node = doc.getElementById(key);
+                    return node ? node.innerHTML : undefined;
+                }
+                doc = doc || document;
+                node = doc.getElementById(key);
+                //清除样式
+                if (style === "") {
+                    if (node) {
+                        node.parentNode.removeChild(node);
+                        return true;
+                    }
+                    return false;
+                }
+                //添加样式
+                if (node) {
+                    node.innerHTML = style;
+                } else {
+                    node = doc.createElement("style");
+                    node.id = key;
+                    node.innerHTML = style;
+                    doc.getElementsByTagName("head")[0].appendChild(node);
+                }
+            },
+            keys: function(plain) {
+                var keys = [];
+                for (var key in plain) {
+                    if (plain.hasOwnProperty(key)) {
+                        keys.push(key);
+                    }
+                }
+                return keys;
+            },
+            proxy: function(fn, context) {
+                return function() {
+                    return fn.apply(context, arguments);
+                };
+            },
+            indexOf: function(array, item, start) {
+                var index = -1;
+                start = this.isNumber(start) ? start : 0;
+                this.each(array, function(v, i) {
+                    if (i >= start && v === item) {
+                        index = i;
+                        return false;
+                    }
+                });
+                return index;
+            },
+            argsToArray: function(args, index) {
+                return Array.prototype.slice.call(args, index || 0);
+            },
+            clonePlainObject: function(source, target) {
+                var tmp;
+                target = target || {};
+                for (var i in source) {
+                    if (source.hasOwnProperty(i)) {
+                        tmp = source[i];
+                        if (utils.isObject(tmp) || utils.isArray(tmp)) {
+                            target[i] = utils.isArray(tmp) ? [] : {};
+                            utils.clonePlainObject(source[i], target[i]);
+                        } else {
+                            target[i] = tmp;
+                        }
+                    }
+                }
+                return target;
+            },
+            compareObject: function(source, target) {
+                var tmp;
+                if (this.isEmptyObject(source) !== this.isEmptyObject(target)) {
+                    return false;
+                }
+                if (this.getObjectLength(source) != this.getObjectLength(target)) {
+                    return false;
+                }
+                for (var p in source) {
+                    if (source.hasOwnProperty(p)) {
+                        tmp = source[p];
+                        if (target[p] === undefined) {
+                            return false;
+                        }
+                        if (this.isObject(tmp) || this.isArray(tmp)) {
+                            if (this.isObject(target[p]) !== this.isObject(tmp)) {
+                                return false;
+                            }
+                            if (this.isArray(tmp) !== this.isArray(target[p])) {
+                                return false;
+                            }
+                            if (this.compareObject(tmp, target[p]) === false) {
+                                return false;
+                            }
+                        } else {
+                            if (tmp != target[p]) {
+                                return false;
+                            }
+                        }
+                    }
+                }
+                return true;
+            },
+            getObjectLength: function(obj) {
+                if (this.isArray(obj) || this.isString(obj)) return obj.length;
+                var count = 0;
+                for (var key in obj) if (obj.hasOwnProperty(key)) count++;
+                return count;
+            },
+            isEmptyObject: function(obj) {
+                if (obj == null) return true;
+                if (this.isArray(obj) || this.isString(obj)) return obj.length === 0;
+                for (var key in obj) if (obj.hasOwnProperty(key)) return false;
+                return true;
+            },
+            loadFile: function() {
+                var tmpList = [];
+                function getItem(doc, obj) {
+                    try {
+                        for (var i = 0, ci; ci = tmpList[i++]; ) {
+                            if (ci.doc === doc && ci.url == (obj.src || obj.href)) {
+                                return ci;
+                            }
+                        }
+                    } catch (e) {
+                        return null;
+                    }
+                }
+                return function(doc, obj, fn) {
+                    var item = getItem(doc, obj);
+                    if (item) {
+                        if (item.ready) {
+                            fn && fn();
+                        } else {
+                            item.funs.push(fn);
+                        }
+                        return;
+                    }
+                    tmpList.push({
+                        doc: doc,
+                        url: obj.src || obj.href,
+                        funs: [ fn ]
+                    });
+                    if (!doc.body) {
+                        var html = [];
+                        for (var p in obj) {
+                            if (p == "tag") continue;
+                            html.push(p + '="' + obj[p] + '"');
+                        }
+                        doc.write("<" + obj.tag + " " + html.join(" ") + " ></" + obj.tag + ">");
+                        return;
+                    }
+                    if (obj.id && doc.getElementById(obj.id)) {
+                        return;
+                    }
+                    var element = doc.createElement(obj.tag);
+                    delete obj.tag;
+                    for (var p in obj) {
+                        element.setAttribute(p, obj[p]);
+                    }
+                    element.onload = element.onreadystatechange = function() {
+                        if (!this.readyState || /loaded|complete/.test(this.readyState)) {
+                            item = getItem(doc, obj);
+                            if (item.funs.length > 0) {
+                                item.ready = 1;
+                                for (var fi; fi = item.funs.pop(); ) {
+                                    fi();
+                                }
+                            }
+                            element.onload = element.onreadystatechange = null;
+                        }
+                    };
+                    //            element.onerror = function () {
+                    //                throw Error('The load ' + (obj.href || obj.src) + ' fails,check the url settings of file ')
+                    //            };
+                    doc.getElementsByTagName("head")[0].appendChild(element);
+                };
+            }(),
+            clone: function(source, target) {
+                var tmp;
+                target = target || {};
+                for (var i in source) {
+                    if (source.hasOwnProperty(i)) {
+                        tmp = source[i];
+                        if (typeof tmp == "object") {
+                            target[i] = utils.isArray(tmp) ? [] : {};
+                            utils.clone(source[i], target[i]);
+                        } else {
+                            target[i] = tmp;
+                        }
+                    }
+                }
+                return target;
+            },
+            unhtml: function(str, reg) {
+                return str ? str.replace(reg || /[&<">'](?:(amp|lt|quot|gt|#39|nbsp);)?/g, function(a, b) {
+                    if (b) {
+                        return a;
+                    } else {
+                        return {
+                            "<": "&lt;",
+                            "&": "&amp;",
+                            '"': "&quot;",
+                            ">": "&gt;",
+                            "'": "&#39;"
+                        }[a];
+                    }
+                }) : "";
+            },
+            cloneArr: function(arr) {
+                return [].concat(arr);
+            },
+            clearWhitespace: function(str) {
+                return str.replace(/[\u200b\t\r\n]/g, "");
+            },
+            getValueByIndex: function(data, index) {
+                var initIndex = 0, result = 0;
+                utils.each(data, function(i, arr) {
+                    if (initIndex + arr.length >= index) {
+                        if (index - initIndex == arr.length) {
+                            if (arr.length == 1 && arr[0].width === 0) {
+                                initIndex++;
+                                return;
+                            }
+                            result = {
+                                x: arr[arr.length - 1].x + arr[arr.length - 1].width,
+                                y: arr[arr.length - 1].y
+                            };
+                        } else {
+                            result = arr[index - initIndex];
+                        }
+                        return false;
+                    } else {
+                        initIndex += arr.length + (arr.length == 1 && arr[0].width === 0 ? 0 : 1);
+                    }
+                });
+                return result;
+            },
+            getNodeIndex: function(node, ignoreTextNode) {
+                var preNode = node, i = 0;
+                while (preNode = preNode.previousSibling) {
+                    if (ignoreTextNode && preNode.nodeType == 3) {
+                        if (preNode.nodeType != preNode.nextSibling.nodeType) {
+                            i++;
+                        }
+                        continue;
+                    }
+                    i++;
+                }
+                return i;
+            }
+        };
+        Utils.each([ "String", "Function", "Array", "Number", "RegExp", "Object" ], function(i, v) {
+            KityMinder.Utils["is" + v] = function(obj) {
+                return Object.prototype.toString.apply(obj) == "[object " + v + "]";
+            };
+        });
+        return module.exports = Minder;
     }
 };
 
@@ -296,7 +642,7 @@ _p[7] = {
  */
 _p[8] = {
     value: function(require, exports, module) {
-        _p.r(15);
+        _p.r(16);
         var Debug = _p.r(13);
         var debug = new Debug("input");
         function InputRuntime() {
@@ -305,14 +651,17 @@ _p[8] = {
             var hotbox = this.hotbox;
             var receiver = this.receiver;
             var receiverElement = receiver.element;
-            // setup them
+            // setup everything to go
             setupReciverElement();
             setupFsm();
             setupHotbox();
             // expose editText()
             this.editText = editText;
+            // listen the fsm changes, make action.
             function setupFsm() {
+                // when jumped to input mode, enter
                 fsm.when("* -> input", enterInputMode);
+                // when exited, commit or exit depends on the exit reason
                 fsm.when("input -> *", function(exit, enter, reason) {
                     switch (reason) {
                       case "input-commit":
@@ -322,12 +671,14 @@ _p[8] = {
                         return exitInputMode();
                     }
                 });
+                // lost focus to commit
                 minder.on("beforemousedown", function() {
                     if (fsm.state() == "input") {
                         fsm.jump("normal", "input-commit");
                     }
                 });
             }
+            // let the receiver follow the current selected node position
             function setupReciverElement() {
                 if (debug.flaged) {
                     receiverElement.classList.add("debug");
@@ -336,11 +687,13 @@ _p[8] = {
                     e.stopPropagation();
                 };
                 minder.on("layoutallfinish viewchange viewchanged selectionchange", function(e) {
+                    // viewchange event is too frequenced, lazy it
                     if (e.type == "viewchange" && fsm.state() != "input") return;
                     updatePosition();
                 });
                 updatePosition();
             }
+            // edit entrance in hotbox
             function setupHotbox() {
                 hotbox.state("main").button({
                     position: "center",
@@ -352,13 +705,9 @@ _p[8] = {
                     action: editText
                 });
             }
+            // edit for the selected node
             function editText() {
-                var text = minder.queryCommandValue("text");
-                if ("innerText" in receiverElement) {
-                    receiverElement.innerText = text;
-                } else {
-                    receiverElement.innerHTML = text && text.replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/\n/g, "<br>");
-                }
+                receiverElement.innerText = minder.queryCommandValue("text");
                 fsm.jump("input", "input-request");
                 receiver.selectAll();
             }
@@ -383,15 +732,18 @@ _p[8] = {
                 receiver.selectAll();
             }
             function updatePosition() {
-                var cache = updatePosition;
-                cache.fixedX = cache.fixedX || 0;
-                cache.fixedY = cache.fixedY || 0;
-                var focusNode = minder.getSelectedNode() || minder.getRoot();
+                var planed = updatePosition;
+                var focusNode = minder.getSelectedNode();
                 if (!focusNode) return;
-                var box = focusNode.getRenderBox("TextRenderer");
-                receiverElement.style.left = Math.round(box.x) + "px";
-                receiverElement.style.top = Math.round(box.y) + "px";
-                receiverElement.focus();
+                if (!planed.timer) {
+                    planed.timer = setTimeout(function() {
+                        var box = focusNode.getRenderBox("TextRenderer");
+                        receiverElement.style.left = Math.round(box.x) + "px";
+                        receiverElement.style.top = (debug.flaged ? Math.round(box.bottom + 30) : Math.round(box.y)) + "px";
+                        receiverElement.focus();
+                        planed.timer = 0;
+                    });
+                }
             }
         }
         return module.exports = InputRuntime;
@@ -424,6 +776,7 @@ _p[9] = {
             var fsm = this.fsm;
             var minder = this.minder;
             var receiver = this.receiver;
+            var container = this.container;
             var receiverElement = receiver.element;
             var hotbox = this.hotbox;
             // normal -> *
@@ -469,6 +822,38 @@ _p[9] = {
                         e.preventDefault();
                     }
                 }
+            });
+            //////////////////////////////////////////////
+            /// 右键呼出热盒
+            /// 判断的标准是：按下的位置和结束的位置一致
+            //////////////////////////////////////////////
+            var downX, downY;
+            var MOUSE_RB = 2;
+            // 右键
+            container.addEventListener("mousedown", function(e) {
+                if (fsm.state() == "hotbox") {
+                    hotbox.active(Hotbox.STATE_IDLE);
+                    fsm.jump("normal", "blur");
+                } else if (fsm.state() == "normal" && e.button == MOUSE_RB) {
+                    downX = e.clientX;
+                    downY = e.clientY;
+                }
+            }, false);
+            container.addEventListener("mouseup", function(e) {
+                if (fsm.state() != "normal") {
+                    return;
+                }
+                if (e.button != MOUSE_RB || e.clientX != downX || e.clientY != downY) {
+                    return;
+                }
+                if (!minder.getSelectedNode()) {
+                    return;
+                }
+                fsm.jump("hotbox", "content-menu");
+            }, false);
+            // 阻止热盒事件冒泡，在热盒正确执行前导致热盒关闭
+            hotbox.$element.addEventListener("mousedown", function(e) {
+                e.stopPropagation();
             });
         }
         return module.exports = JumpingRuntime;
@@ -555,7 +940,7 @@ _p[11] = {
  */
 _p[12] = {
     value: function(require, exports, module) {
-        var key = _p.r(16);
+        var key = _p.r(17);
         function ReceiverRuntime() {
             var fsm = this.fsm;
             var minder = this.minder;
@@ -688,16 +1073,25 @@ _p[14] = {
     }
 };
 
-//src/tool/innertext.js
+//src/tool/fuck.js
 /**
  * @fileOverview
  *
- *
+ * 脑图ccc
  *
  * @author: techird
  * @copyright: Baidu FEX, 2014
  */
-_p[15] = {
+//src/tool/innertext.js
+/**
+ * @fileOverview
+ *
+ * innerText polyfill
+ *
+ * @author: techird
+ * @copyright: Baidu FEX, 2014
+ */
+_p[16] = {
     value: function(require, exports, module) {
         if (!("innerText" in document.createElement("a")) && "getSelection" in window) {
             HTMLElement.prototype.__defineGetter__("innerText", function() {
@@ -731,24 +1125,24 @@ _p[15] = {
 };
 
 //src/tool/key.js
-_p[16] = {
+_p[17] = {
     value: function(require, exports, module) {
-        return module.exports = _p.r(19);
+        return module.exports = _p.r(20);
     }
 };
 
 //lib/hotbox/src/expose.js
-_p[17] = {
+_p[18] = {
     value: function(require, exports, module) {
-        module.exports = window.HotBox = _p.r(18);
+        module.exports = window.HotBox = _p.r(19);
     }
 };
 
 //lib/hotbox/src/hotbox.js
-_p[18] = {
+_p[19] = {
     value: function(require, exports, module) {
-        var key = _p.r(19);
-        var KeyControl = _p.r(20);
+        var key = _p.r(20);
+        var KeyControl = _p.r(21);
         /**** Dom Utils ****/
         function createElement(name) {
             return document.createElement(name);
@@ -936,9 +1330,9 @@ _p[18] = {
             addElementClass($bottom, "bottom");
             // 摆放容器
             appendChild(hotBox.$element, $state);
+            appendChild($state, $ringShape);
             appendChild($state, $center);
             appendChild($state, $ring);
-            appendChild($ring, $ringShape);
             appendChild($state, $top);
             appendChild($state, $bottom);
             // 记住状态名称
@@ -1248,9 +1642,9 @@ _p[18] = {
 };
 
 //lib/hotbox/src/key.js
-_p[19] = {
+_p[20] = {
     value: function(require, exports, module) {
-        var keymap = _p.r(21);
+        var keymap = _p.r(22);
         var CTRL_MASK = 4096;
         var ALT_MASK = 8192;
         var SHIFT_MASK = 16384;
@@ -1309,9 +1703,9 @@ _p[19] = {
 };
 
 //lib/hotbox/src/keycontrol.js
-_p[20] = {
+_p[21] = {
     value: function(require, exports, module) {
-        var key = _p.r(19);
+        var key = _p.r(20);
         var FOCUS_CLASS = "hotbox-focus";
         var RECEIVER_CLASS = "hotbox-key-receiver";
         function KeyControl(hotbox) {
@@ -1372,7 +1766,7 @@ _p[20] = {
 };
 
 //lib/hotbox/src/keymap.js
-_p[21] = {
+_p[22] = {
     value: function(require, exports, module) {
         var keymap = {
             Shift: 16,
@@ -1451,10 +1845,10 @@ _p[21] = {
  * @author: techird
  * @copyright: Baidu FEX, 2014
  */
-_p[22] = {
+_p[23] = {
     value: function(require, exports, module) {
-        var kity = _p.r(37);
-        var connect = _p.r(31);
+        var kity = _p.r(38);
+        var connect = _p.r(32);
         var connectMarker = new kity.Marker().pipe(function() {
             var r = 7;
             var dot = new kity.Circle(r - 1);
@@ -1491,10 +1885,10 @@ _p[22] = {
  * @author: techird
  * @copyright: Baidu FEX, 2014
  */
-_p[23] = {
+_p[24] = {
     value: function(require, exports, module) {
-        var kity = _p.r(37);
-        var connect = _p.r(31);
+        var kity = _p.r(38);
+        var connect = _p.r(32);
         connect.register("bezier", function(node, parent, connection) {
             // 连线起点和终点
             var po = parent.getLayoutVertexOut(), pi = node.getLayoutVertexIn();
@@ -1528,10 +1922,10 @@ _p[23] = {
  * @author: techird
  * @copyright: Baidu FEX, 2014
  */
-_p[24] = {
+_p[25] = {
     value: function(require, exports, module) {
-        var kity = _p.r(37);
-        var connect = _p.r(31);
+        var kity = _p.r(38);
+        var connect = _p.r(32);
         connect.register("fish-bone-master", function(node, parent, connection) {
             var pout = parent.getLayoutVertexOut(), pin = node.getLayoutVertexIn();
             var abs = Math.abs;
@@ -1555,10 +1949,10 @@ _p[24] = {
  * @author: techird
  * @copyright: Baidu FEX, 2014
  */
-_p[25] = {
+_p[26] = {
     value: function(require, exports, module) {
-        var kity = _p.r(37);
-        var connect = _p.r(31);
+        var kity = _p.r(38);
+        var connect = _p.r(32);
         connect.register("l", function(node, parent, connection) {
             var po = parent.getLayoutVertexOut();
             var pi = node.getLayoutVertexIn();
@@ -1586,10 +1980,10 @@ _p[25] = {
  * @author: techird
  * @copyright: Baidu FEX, 2014
  */
-_p[26] = {
+_p[27] = {
     value: function(require, exports, module) {
-        var kity = _p.r(37);
-        var connect = _p.r(31);
+        var kity = _p.r(38);
+        var connect = _p.r(32);
         connect.register("poly", function(node, parent, connection, width) {
             // 连线起点和终点
             var po = parent.getLayoutVertexOut(), pi = node.getLayoutVertexIn();
@@ -1643,10 +2037,10 @@ _p[26] = {
  * @author: techird
  * @copyright: Baidu FEX, 2014
  */
-_p[27] = {
+_p[28] = {
     value: function(require, exports, module) {
-        var kity = _p.r(37);
-        var connect = _p.r(31);
+        var kity = _p.r(38);
+        var connect = _p.r(32);
         connect.register("under", function(node, parent, connection, width, color) {
             var box = node.getLayoutBox(), pBox = parent.getLayoutBox();
             var start, end, vector;
@@ -1685,9 +2079,9 @@ _p[27] = {
  * @author: techird
  * @copyright: Baidu FEX, 2014
  */
-_p[28] = {
+_p[29] = {
     value: function(require, exports, module) {
-        var Minder = _p.r(39);
+        var Minder = _p.r(40);
         var animateDefaultOptions = {
             enableAnimation: true,
             layoutAnimationDuration: 300,
@@ -1720,13 +2114,13 @@ _p[28] = {
 };
 
 //lib/km-core/src/core/command.js
-_p[29] = {
+_p[30] = {
     value: function(require, exports, module) {
-        var kity = _p.r(37);
-        var utils = _p.r(52);
-        var Minder = _p.r(39);
-        var MinderNode = _p.r(41);
-        var MinderEvent = _p.r(33);
+        var kity = _p.r(38);
+        var utils = _p.r(53);
+        var Minder = _p.r(40);
+        var MinderNode = _p.r(42);
+        var MinderEvent = _p.r(34);
         var COMMAND_STATE_NORMAL = 0;
         var COMMAND_STATE_DISABLED = -1;
         var COMMAND_STATE_ACTIVED = 1;
@@ -1866,9 +2260,9 @@ _p[29] = {
 };
 
 //lib/km-core/src/core/compatibility.js
-_p[30] = {
+_p[31] = {
     value: function(require, exports, module) {
-        var utils = _p.r(52);
+        var utils = _p.r(53);
         function compatibility(json) {
             var version = json.version || (json.root ? "1.4.0" : "1.1.3");
             switch (version) {
@@ -1952,13 +2346,13 @@ _p[30] = {
 };
 
 //lib/km-core/src/core/connect.js
-_p[31] = {
+_p[32] = {
     value: function(require, exports, module) {
-        var kity = _p.r(37);
-        var utils = _p.r(52);
-        var Module = _p.r(40);
-        var Minder = _p.r(39);
-        var MinderNode = _p.r(41);
+        var kity = _p.r(38);
+        var utils = _p.r(53);
+        var Module = _p.r(41);
+        var Minder = _p.r(40);
+        var MinderNode = _p.r(42);
         // 连线提供方
         var _connectProviders = {};
         function register(name, provider) {
@@ -2054,15 +2448,15 @@ _p[31] = {
 };
 
 //lib/km-core/src/core/data.js
-_p[32] = {
+_p[33] = {
     value: function(require, exports, module) {
-        var kity = _p.r(37);
-        var utils = _p.r(52);
-        var Minder = _p.r(39);
-        var MinderNode = _p.r(41);
-        var MinderEvent = _p.r(33);
-        var compatibility = _p.r(30);
-        var Promise = _p.r(44);
+        var kity = _p.r(38);
+        var utils = _p.r(53);
+        var Minder = _p.r(40);
+        var MinderNode = _p.r(42);
+        var MinderEvent = _p.r(34);
+        var compatibility = _p.r(31);
+        var Promise = _p.r(45);
         var protocols = {};
         function registerProtocol(name, protocol) {
             protocols[name] = protocol;
@@ -2174,7 +2568,7 @@ _p[32] = {
          *
          * @param {string} protocol 指定的数据协议（默认内置五种数据协议 `json`、`text`、`markdown`、`svg` 和 `png`）
          */
-            exportData: function(protocolName) {
+            exportData: function(protocolName, option) {
                 var json, protocol;
                 json = this.exportJson();
                 // 指定了协议进行导出，需要检测协议是否支持
@@ -2190,7 +2584,7 @@ _p[32] = {
                     protocolName: protocolName,
                     protocol: protocol
                 }));
-                return Promise.resolve(protocol.encode(json, this));
+                return Promise.resolve(protocol.encode(json, this, option));
             },
             /**
          * @method importData()
@@ -2202,7 +2596,7 @@ _p[32] = {
          * @param {string} protocol 指定的用于解析数据的数据协议（默认内置三种数据协议 `json`、`text` 和 `markdown` 的支持）
          * @param {any} data 要导入的数据
          */
-            importData: function(protocolName, data) {
+            importData: function(protocolName, data, option) {
                 var json, protocol;
                 var minder = this;
                 // 指定了协议进行导入，需要检测协议是否支持
@@ -2219,7 +2613,7 @@ _p[32] = {
                 };
                 // 导入前抛事件
                 this._fire(new MinderEvent("beforeimport", params));
-                return Promise.resolve(protocol.decode(data, this)).then(function(json) {
+                return Promise.resolve(protocol.decode(data, this, option)).then(function(json) {
                     minder.importJson(json);
                     return json;
                 });
@@ -2229,11 +2623,11 @@ _p[32] = {
 };
 
 //lib/km-core/src/core/event.js
-_p[33] = {
+_p[34] = {
     value: function(require, exports, module) {
-        var kity = _p.r(37);
-        var utils = _p.r(52);
-        var Minder = _p.r(39);
+        var kity = _p.r(38);
+        var utils = _p.r(53);
+        var Minder = _p.r(40);
         /**
      * @class MinderEvent
      * @description 表示一个脑图中发生的事件
@@ -2461,10 +2855,10 @@ _p[33] = {
 };
 
 //lib/km-core/src/core/focus.js
-_p[34] = {
+_p[35] = {
     value: function(require, exports, module) {
-        var kity = _p.r(37);
-        var Minder = _p.r(39);
+        var kity = _p.r(38);
+        var Minder = _p.r(40);
         Minder.registerInitHook(function() {
             this.on("beforemousedown", function(e) {
                 this.focus();
@@ -2502,7 +2896,7 @@ _p[34] = {
 };
 
 //lib/km-core/src/core/keymap.js
-_p[35] = {
+_p[36] = {
     value: function(require, exports, module) {
         var keymap = {
             Backspace: 8,
@@ -2613,11 +3007,11 @@ _p[35] = {
 };
 
 //lib/km-core/src/core/keyreceiver.js
-_p[36] = {
+_p[37] = {
     value: function(require, exports, module) {
-        var kity = _p.r(37);
-        var utils = _p.r(52);
-        var Minder = _p.r(39);
+        var kity = _p.r(38);
+        var utils = _p.r(53);
+        var Minder = _p.r(40);
         function listen(element, type, handler) {
             type.split(" ").forEach(function(name) {
                 element.addEventListener(name, handler, false);
@@ -2683,21 +3077,21 @@ _p[36] = {
  * @author: techird
  * @copyright: Baidu FEX, 2014
  */
-_p[37] = {
+_p[38] = {
     value: function(require, exports, module) {
         module.exports = window.kity;
     }
 };
 
 //lib/km-core/src/core/layout.js
-_p[38] = {
+_p[39] = {
     value: function(require, exports, module) {
-        var kity = _p.r(37);
-        var utils = _p.r(52);
-        var Minder = _p.r(39);
-        var MinderNode = _p.r(41);
-        var MinderEvent = _p.r(33);
-        var Command = _p.r(29);
+        var kity = _p.r(38);
+        var utils = _p.r(53);
+        var Minder = _p.r(40);
+        var MinderNode = _p.r(42);
+        var MinderEvent = _p.r(34);
+        var Command = _p.r(30);
         var _layouts = {};
         var _defaultLayout;
         function register(name, layout) {
@@ -3129,10 +3523,10 @@ _p[38] = {
  * @author: techird
  * @copyright: Baidu FEX, 2014
  */
-_p[39] = {
+_p[40] = {
     value: function(require, exports, module) {
-        var kity = _p.r(37);
-        var utils = _p.r(52);
+        var kity = _p.r(38);
+        var utils = _p.r(53);
         var _initHooks = [];
         var Minder = kity.createClass("Minder", {
             constructor: function(options) {
@@ -3157,11 +3551,11 @@ _p[39] = {
 };
 
 //lib/km-core/src/core/module.js
-_p[40] = {
+_p[41] = {
     value: function(require, exports, module) {
-        var kity = _p.r(37);
-        var utils = _p.r(52);
-        var Minder = _p.r(39);
+        var kity = _p.r(38);
+        var utils = _p.r(53);
+        var Minder = _p.r(40);
         /* 已注册的模块 */
         var _modules = {};
         exports.register = function(name, module) {
@@ -3257,11 +3651,11 @@ _p[40] = {
 };
 
 //lib/km-core/src/core/node.js
-_p[41] = {
+_p[42] = {
     value: function(require, exports, module) {
-        var kity = _p.r(37);
-        var utils = _p.r(52);
-        var Minder = _p.r(39);
+        var kity = _p.r(38);
+        var utils = _p.r(53);
+        var Minder = _p.r(40);
         /**
      * @class MinderNode
      *
@@ -3574,11 +3968,11 @@ _p[41] = {
  * @author: techird
  * @copyright: Baidu FEX, 2014
  */
-_p[42] = {
+_p[43] = {
     value: function(require, exports, module) {
-        var kity = _p.r(37);
-        var utils = _p.r(52);
-        var Minder = _p.r(39);
+        var kity = _p.r(38);
+        var utils = _p.r(53);
+        var Minder = _p.r(40);
         Minder.registerInitHook(function(options) {
             this._defaultOptions = {};
         });
@@ -3610,11 +4004,11 @@ _p[42] = {
  * @author: techird
  * @copyright: Baidu FEX, 2014
  */
-_p[43] = {
+_p[44] = {
     value: function(require, exports, module) {
-        var kity = _p.r(37);
-        var utils = _p.r(52);
-        var Minder = _p.r(39);
+        var kity = _p.r(38);
+        var utils = _p.r(53);
+        var Minder = _p.r(40);
         Minder.registerInitHook(function() {
             this._initPaper();
         });
@@ -3670,7 +4064,7 @@ _p[43] = {
 };
 
 //lib/km-core/src/core/promise.js
-_p[44] = {
+_p[45] = {
     value: function(require, exports, module) {
         /*!
     **  Thenable -- Embeddable Minimum Strictly-Compliant Promises/A+ 1.1.1 Thenable
@@ -3859,10 +4253,10 @@ _p[44] = {
  * @author: techird
  * @copyright: Baidu FEX, 2014
  */
-_p[45] = {
+_p[46] = {
     value: function(require, exports, module) {
-        var kity = _p.r(37);
-        var Minder = _p.r(39);
+        var kity = _p.r(38);
+        var Minder = _p.r(40);
         Minder.registerInitHook(function(options) {
             if (options.readOnly) {
                 this.setDisabled();
@@ -3909,11 +4303,11 @@ _p[45] = {
 };
 
 //lib/km-core/src/core/render.js
-_p[46] = {
+_p[47] = {
     value: function(require, exports, module) {
-        var kity = _p.r(37);
-        var Minder = _p.r(39);
-        var MinderNode = _p.r(41);
+        var kity = _p.r(38);
+        var Minder = _p.r(40);
+        var MinderNode = _p.r(42);
         var Renderer = kity.createClass("Renderer", {
             constructor: function(node) {
                 this.node = node;
@@ -4121,12 +4515,12 @@ _p[46] = {
 };
 
 //lib/km-core/src/core/select.js
-_p[47] = {
+_p[48] = {
     value: function(require, exports, module) {
-        var kity = _p.r(37);
-        var utils = _p.r(52);
-        var Minder = _p.r(39);
-        var MinderNode = _p.r(41);
+        var kity = _p.r(38);
+        var utils = _p.r(53);
+        var Minder = _p.r(40);
+        var MinderNode = _p.r(42);
         Minder.registerInitHook(function() {
             this._initSelection();
         });
@@ -4254,13 +4648,13 @@ _p[47] = {
  * @author: techird
  * @copyright: Baidu FEX, 2014
  */
-_p[48] = {
+_p[49] = {
     value: function(require, exports, module) {
-        var kity = _p.r(37);
-        var utils = _p.r(52);
-        var keymap = _p.r(35);
-        var Minder = _p.r(39);
-        var MinderEvent = _p.r(33);
+        var kity = _p.r(38);
+        var utils = _p.r(53);
+        var keymap = _p.r(36);
+        var Minder = _p.r(40);
+        var MinderEvent = _p.r(34);
         /**
      * 计算包含 meta 键的 keycode
      *
@@ -4384,10 +4778,10 @@ _p[48] = {
  * @author: techird
  * @copyright: Baidu FEX, 2014
  */
-_p[49] = {
+_p[50] = {
     value: function(require, exports, module) {
-        var kity = _p.r(37);
-        var Minder = _p.r(39);
+        var kity = _p.r(38);
+        var Minder = _p.r(40);
         var sf = ~window.location.href.indexOf("status");
         var tf = ~window.location.href.indexOf("trace");
         Minder.registerInitHook(function() {
@@ -4432,14 +4826,14 @@ _p[49] = {
 };
 
 //lib/km-core/src/core/template.js
-_p[50] = {
+_p[51] = {
     value: function(require, exports, module) {
-        var kity = _p.r(37);
-        var utils = _p.r(52);
-        var Minder = _p.r(39);
-        var Command = _p.r(29);
-        var MinderNode = _p.r(41);
-        var Module = _p.r(40);
+        var kity = _p.r(38);
+        var utils = _p.r(53);
+        var Minder = _p.r(40);
+        var Command = _p.r(30);
+        var MinderNode = _p.r(42);
+        var Module = _p.r(41);
         var _templates = {};
         function register(name, supports) {
             _templates[name] = supports;
@@ -4514,14 +4908,14 @@ _p[50] = {
 };
 
 //lib/km-core/src/core/theme.js
-_p[51] = {
+_p[52] = {
     value: function(require, exports, module) {
-        var kity = _p.r(37);
-        var utils = _p.r(52);
-        var Minder = _p.r(39);
-        var MinderNode = _p.r(41);
-        var Module = _p.r(40);
-        var Command = _p.r(29);
+        var kity = _p.r(38);
+        var utils = _p.r(53);
+        var Minder = _p.r(40);
+        var MinderNode = _p.r(42);
+        var Module = _p.r(41);
+        var Command = _p.r(30);
         var cssLikeValueMatcher = {
             left: function(value) {
                 return 3 in value && value[3] || 1 in value && value[1] || value[0];
@@ -4666,9 +5060,9 @@ _p[51] = {
 };
 
 //lib/km-core/src/core/utils.js
-_p[52] = {
+_p[53] = {
     value: function(require, exports) {
-        var kity = _p.r(37);
+        var kity = _p.r(38);
         var uuidMap = {};
         exports.extend = kity.Utils.extend.bind(kity.Utils);
         exports.each = kity.Utils.each.bind(kity.Utils);
@@ -4725,9 +5119,9 @@ _p[52] = {
 };
 
 //lib/km-core/src/expose-kityminder.js
-_p[53] = {
+_p[54] = {
     value: function(require, exports, module) {
-        module.exports = window.kityminder = _p.r(54);
+        module.exports = window.kityminder = _p.r(55);
     }
 };
 
@@ -4740,39 +5134,38 @@ _p[53] = {
  * @author: techird
  * @copyright: Baidu FEX, 2014
  */
-_p[54] = {
+_p[55] = {
     value: function(require, exports, module) {
         var kityminder = {
-            version: _p.r(39).version
+            version: _p.r(40).version
         };
         // 核心导出，大写的部分导出类，小写的部分简单 require 一下
         // 这里顺序是有讲究的，调整前先弄清楚依赖关系。
-        _p.r(52);
-        kityminder.Minder = _p.r(39);
-        kityminder.Command = _p.r(29);
-        kityminder.Node = _p.r(41);
-        _p.r(42);
-        _p.r(28);
-        kityminder.Event = _p.r(33);
-        kityminder.data = _p.r(32);
-        _p.r(30);
-        kityminder.KeyMap = _p.r(35);
-        _p.r(48);
-        _p.r(49);
+        _p.r(53);
+        kityminder.Minder = _p.r(40);
+        kityminder.Command = _p.r(30);
+        kityminder.Node = _p.r(42);
         _p.r(43);
-        _p.r(47);
-        _p.r(34);
-        _p.r(36);
-        kityminder.Module = _p.r(40);
-        _p.r(45);
-        kityminder.Render = _p.r(46);
-        kityminder.Connect = _p.r(31);
-        kityminder.Layout = _p.r(38);
-        kityminder.Theme = _p.r(51);
-        kityminder.Template = _p.r(50);
-        kityminder.Promise = _p.r(44);
+        _p.r(29);
+        kityminder.Event = _p.r(34);
+        kityminder.data = _p.r(33);
+        _p.r(31);
+        kityminder.KeyMap = _p.r(36);
+        _p.r(49);
+        _p.r(50);
+        _p.r(44);
+        _p.r(48);
+        _p.r(35);
+        _p.r(37);
+        kityminder.Module = _p.r(41);
+        _p.r(46);
+        kityminder.Render = _p.r(47);
+        kityminder.Connect = _p.r(32);
+        kityminder.Layout = _p.r(39);
+        kityminder.Theme = _p.r(52);
+        kityminder.Template = _p.r(51);
+        kityminder.Promise = _p.r(45);
         // 模块依赖
-        _p.r(60);
         _p.r(61);
         _p.r(62);
         _p.r(63);
@@ -4795,40 +5188,41 @@ _p[54] = {
         _p.r(80);
         _p.r(81);
         _p.r(82);
-        _p.r(86);
         _p.r(83);
-        _p.r(85);
+        _p.r(87);
         _p.r(84);
-        _p.r(59);
-        _p.r(55);
+        _p.r(86);
+        _p.r(85);
+        _p.r(60);
         _p.r(56);
         _p.r(57);
         _p.r(58);
-        _p.r(92);
+        _p.r(59);
+        _p.r(93);
+        _p.r(96);
         _p.r(95);
         _p.r(94);
-        _p.r(93);
-        _p.r(95);
-        _p.r(22);
+        _p.r(97);
         _p.r(23);
         _p.r(24);
         _p.r(25);
         _p.r(26);
         _p.r(27);
-        _p.r(87);
-        _p.r(91);
+        _p.r(28);
         _p.r(88);
-        _p.r(90);
+        _p.r(92);
         _p.r(89);
+        _p.r(91);
+        _p.r(90);
         module.exports = kityminder;
     }
 };
 
 //lib/km-core/src/layout/btree.js
-_p[55] = {
+_p[56] = {
     value: function(require, exports, module) {
-        var kity = _p.r(37);
-        var Layout = _p.r(38);
+        var kity = _p.r(38);
+        var Layout = _p.r(39);
         [ "left", "right", "top", "bottom" ].forEach(registerLayoutForDirection);
         function registerLayoutForDirection(name) {
             var axis = name == "left" || name == "right" ? "x" : "y";
@@ -4949,10 +5343,10 @@ _p[55] = {
 };
 
 //lib/km-core/src/layout/filetree.js
-_p[56] = {
+_p[57] = {
     value: function(require, exports, module) {
-        var kity = _p.r(37);
-        var Layout = _p.r(38);
+        var kity = _p.r(38);
+        var Layout = _p.r(39);
         [ -1, 1 ].forEach(registerLayoutForDir);
         function registerLayoutForDir(dir) {
             var name = "filetree-" + (dir > 0 ? "down" : "up");
@@ -5031,10 +5425,10 @@ _p[56] = {
  * @author: techird
  * @copyright: Baidu FEX, 2014
  */
-_p[57] = {
+_p[58] = {
     value: function(require, exports, module) {
-        var kity = _p.r(37);
-        var Layout = _p.r(38);
+        var kity = _p.r(38);
+        var Layout = _p.r(39);
         Layout.register("fish-bone-master", kity.createClass("FishBoneMasterLayout", {
             base: Layout,
             doLayout: function(parent, children, round) {
@@ -5085,10 +5479,10 @@ _p[57] = {
  * @author: techird
  * @copyright: Baidu FEX, 2014
  */
-_p[58] = {
+_p[59] = {
     value: function(require, exports, module) {
-        var kity = _p.r(37);
-        var Layout = _p.r(38);
+        var kity = _p.r(38);
+        var Layout = _p.r(39);
         Layout.register("fish-bone-slave", kity.createClass("FishBoneSlaveLayout", {
             base: Layout,
             doLayout: function(parent, children, round) {
@@ -5138,11 +5532,11 @@ _p[58] = {
 };
 
 //lib/km-core/src/layout/mind.js
-_p[59] = {
+_p[60] = {
     value: function(require, exports, module) {
-        var kity = _p.r(37);
-        var Layout = _p.r(38);
-        var Minder = _p.r(39);
+        var kity = _p.r(38);
+        var Layout = _p.r(39);
+        var Minder = _p.r(40);
         Layout.register("mind", kity.createClass({
             base: Layout,
             doLayout: function(node, children) {
@@ -5194,12 +5588,12 @@ _p[59] = {
 };
 
 //lib/km-core/src/module/arrange.js
-_p[60] = {
+_p[61] = {
     value: function(require, exports, module) {
-        var kity = _p.r(37);
-        var MinderNode = _p.r(41);
-        var Command = _p.r(29);
-        var Module = _p.r(40);
+        var kity = _p.r(38);
+        var MinderNode = _p.r(42);
+        var Command = _p.r(30);
+        var Module = _p.r(41);
         kity.extendClass(MinderNode, {
             arrange: function(index) {
                 var parent = this.parent;
@@ -5332,15 +5726,15 @@ _p[60] = {
 };
 
 //lib/km-core/src/module/basestyle.js
-_p[61] = {
+_p[62] = {
     value: function(require, exports, module) {
-        var kity = _p.r(37);
-        var utils = _p.r(52);
-        var Minder = _p.r(39);
-        var MinderNode = _p.r(41);
-        var Command = _p.r(29);
-        var Module = _p.r(40);
-        var TextRenderer = _p.r(79);
+        var kity = _p.r(38);
+        var utils = _p.r(53);
+        var Minder = _p.r(40);
+        var MinderNode = _p.r(42);
+        var Command = _p.r(30);
+        var Module = _p.r(41);
+        var TextRenderer = _p.r(80);
         Module.register("basestylemodule", function() {
             var km = this;
             function getNodeDataOrStyle(node, name) {
@@ -5447,13 +5841,13 @@ _p[61] = {
 };
 
 //lib/km-core/src/module/clipboard.js
-_p[62] = {
+_p[63] = {
     value: function(require, exports, module) {
-        var kity = _p.r(37);
-        var utils = _p.r(52);
-        var MinderNode = _p.r(41);
-        var Command = _p.r(29);
-        var Module = _p.r(40);
+        var kity = _p.r(38);
+        var utils = _p.r(53);
+        var MinderNode = _p.r(42);
+        var Command = _p.r(30);
+        var Module = _p.r(41);
         Module.register("ClipboardModule", function() {
             var km = this, _clipboardNodes = [], _selectedNodes = [];
             function appendChildNode(parent, child) {
@@ -5556,13 +5950,13 @@ _p[62] = {
 };
 
 //lib/km-core/src/module/dragtree.js
-_p[63] = {
+_p[64] = {
     value: function(require, exports, module) {
-        var kity = _p.r(37);
-        var utils = _p.r(52);
-        var MinderNode = _p.r(41);
-        var Command = _p.r(29);
-        var Module = _p.r(40);
+        var kity = _p.r(38);
+        var utils = _p.r(53);
+        var MinderNode = _p.r(42);
+        var Command = _p.r(30);
+        var Module = _p.r(41);
         // 矩形的变形动画定义
         var MoveToParentCommand = kity.createClass("MoveToParentCommand", {
             base: Command,
@@ -5880,15 +6274,15 @@ _p[63] = {
 };
 
 //lib/km-core/src/module/expand.js
-_p[64] = {
+_p[65] = {
     value: function(require, exports, module) {
-        var kity = _p.r(37);
-        var utils = _p.r(52);
-        var keymap = _p.r(35);
-        var MinderNode = _p.r(41);
-        var Command = _p.r(29);
-        var Module = _p.r(40);
-        var Renderer = _p.r(46);
+        var kity = _p.r(38);
+        var utils = _p.r(53);
+        var keymap = _p.r(36);
+        var MinderNode = _p.r(42);
+        var Command = _p.r(30);
+        var Module = _p.r(41);
+        var Renderer = _p.r(47);
         Module.register("Expand", function() {
             var minder = this;
             var EXPAND_STATE_DATA = "expandState", STATE_EXPAND = "expand", STATE_COLLAPSE = "collapse";
@@ -6122,15 +6516,15 @@ _p[64] = {
 };
 
 //lib/km-core/src/module/font.js
-_p[65] = {
+_p[66] = {
     value: function(require, exports, module) {
-        var kity = _p.r(37);
-        var utils = _p.r(52);
-        var Minder = _p.r(39);
-        var MinderNode = _p.r(41);
-        var Command = _p.r(29);
-        var Module = _p.r(40);
-        var TextRenderer = _p.r(79);
+        var kity = _p.r(38);
+        var utils = _p.r(53);
+        var Minder = _p.r(40);
+        var MinderNode = _p.r(42);
+        var Command = _p.r(30);
+        var Module = _p.r(41);
+        var TextRenderer = _p.r(80);
         function getNodeDataOrStyle(node, name) {
             return node.getData(name) || node.getStyle(name);
         }
@@ -6269,14 +6663,14 @@ _p[65] = {
 };
 
 //lib/km-core/src/module/history.js
-_p[66] = {
+_p[67] = {
     value: function(require, exports, module) {
-        var kity = _p.r(37);
-        var utils = _p.r(52);
-        var Minder = _p.r(39);
-        var MinderNode = _p.r(41);
-        var Command = _p.r(29);
-        var Module = _p.r(40);
+        var kity = _p.r(38);
+        var utils = _p.r(53);
+        var Minder = _p.r(40);
+        var MinderNode = _p.r(42);
+        var Command = _p.r(30);
+        var Module = _p.r(41);
         function compareObject(source, target) {
             var tmp;
             if (isEmptyObject(source) !== isEmptyObject(target)) {
@@ -6589,15 +6983,15 @@ _p[66] = {
 };
 
 //lib/km-core/src/module/hyperlink.js
-_p[67] = {
+_p[68] = {
     value: function(require, exports, module) {
-        var kity = _p.r(37);
-        var utils = _p.r(52);
-        var Minder = _p.r(39);
-        var MinderNode = _p.r(41);
-        var Command = _p.r(29);
-        var Module = _p.r(40);
-        var Renderer = _p.r(46);
+        var kity = _p.r(38);
+        var utils = _p.r(53);
+        var Minder = _p.r(40);
+        var MinderNode = _p.r(42);
+        var Command = _p.r(30);
+        var Module = _p.r(41);
+        var Renderer = _p.r(47);
         // jscs:disable maximumLineLength
         var linkShapePath = "M16.614,10.224h-1.278c-1.668,0-3.07-1.07-3.599-2.556h4.877c0.707,0,1.278-0.571,1.278-1.278V3.834 c0-0.707-0.571-1.278-1.278-1.278h-4.877C12.266,1.071,13.668,0,15.336,0h1.278c2.116,0,3.834,1.716,3.834,3.834V6.39 C20.448,8.508,18.73,10.224,16.614,10.224z M5.112,5.112c0-0.707,0.573-1.278,1.278-1.278h7.668c0.707,0,1.278,0.571,1.278,1.278 S14.765,6.39,14.058,6.39H6.39C5.685,6.39,5.112,5.819,5.112,5.112z M2.556,3.834V6.39c0,0.707,0.573,1.278,1.278,1.278h4.877 c-0.528,1.486-1.932,2.556-3.599,2.556H3.834C1.716,10.224,0,8.508,0,6.39V3.834C0,1.716,1.716,0,3.834,0h1.278 c1.667,0,3.071,1.071,3.599,2.556H3.834C3.129,2.556,2.556,3.127,2.556,3.834z";
         Module.register("hyperlink", {
@@ -6693,15 +7087,15 @@ _p[67] = {
 };
 
 //lib/km-core/src/module/image.js
-_p[68] = {
+_p[69] = {
     value: function(require, exports, module) {
-        var kity = _p.r(37);
-        var utils = _p.r(52);
-        var Minder = _p.r(39);
-        var MinderNode = _p.r(41);
-        var Command = _p.r(29);
-        var Module = _p.r(40);
-        var Renderer = _p.r(46);
+        var kity = _p.r(38);
+        var utils = _p.r(53);
+        var Minder = _p.r(40);
+        var MinderNode = _p.r(42);
+        var Command = _p.r(30);
+        var Module = _p.r(41);
+        var Renderer = _p.r(47);
         Module.register("image", function() {
             function loadImageSize(url, callback) {
                 var img = document.createElement("img");
@@ -6815,16 +7209,16 @@ _p[68] = {
 };
 
 //lib/km-core/src/module/keynav.js
-_p[69] = {
+_p[70] = {
     value: function(require, exports, module) {
-        var kity = _p.r(37);
-        var utils = _p.r(52);
-        var keymap = _p.r(35);
-        var Minder = _p.r(39);
-        var MinderNode = _p.r(41);
-        var Command = _p.r(29);
-        var Module = _p.r(40);
-        var Renderer = _p.r(46);
+        var kity = _p.r(38);
+        var utils = _p.r(53);
+        var keymap = _p.r(36);
+        var Minder = _p.r(40);
+        var MinderNode = _p.r(42);
+        var Command = _p.r(30);
+        var Module = _p.r(41);
+        var Renderer = _p.r(47);
         Module.register("KeyboardModule", function() {
             var min = Math.min, max = Math.max, abs = Math.abs, sqrt = Math.sqrt, exp = Math.exp;
             function buildPositionNetwork(root) {
@@ -6945,6 +7339,7 @@ _p[69] = {
                         [ "left", "right", "up", "down" ].forEach(function(key) {
                             if (e.isShortcutKey(key)) {
                                 navigateTo(minder, key == "up" ? "top" : key);
+                                e.preventDefault();
                             }
                         });
                     }
@@ -6963,11 +7358,11 @@ _p[69] = {
  * @author: techird
  * @copyright: Baidu FEX, 2014
  */
-_p[70] = {
+_p[71] = {
     value: function(require, exports, module) {
-        var kity = _p.r(37);
-        var Command = _p.r(29);
-        var Module = _p.r(40);
+        var kity = _p.r(38);
+        var Command = _p.r(30);
+        var Module = _p.r(41);
         /**
      * @command Layout
      * @description 设置选中节点的布局
@@ -7038,15 +7433,15 @@ _p[70] = {
 };
 
 //lib/km-core/src/module/node.js
-_p[71] = {
+_p[72] = {
     value: function(require, exports, module) {
-        var kity = _p.r(37);
-        var utils = _p.r(52);
-        var Minder = _p.r(39);
-        var MinderNode = _p.r(41);
-        var Command = _p.r(29);
-        var Module = _p.r(40);
-        var Renderer = _p.r(46);
+        var kity = _p.r(38);
+        var utils = _p.r(53);
+        var Minder = _p.r(40);
+        var MinderNode = _p.r(42);
+        var Command = _p.r(30);
+        var Module = _p.r(41);
+        var Renderer = _p.r(47);
         /**
      * @command AppendChildNode
      * @description 添加子节点到选中的节点中
@@ -7126,7 +7521,7 @@ _p[71] = {
             },
             queryState: function(km) {
                 var selectedNode = km.getSelectedNode();
-                return selectedNode ? 0 : -1;
+                return selectedNode && !selectedNode.isRoot() ? 0 : -1;
             }
         });
         var AppendParentCommand = kity.createClass("AppendParentCommand", {
@@ -7184,15 +7579,15 @@ _p[71] = {
  * @author: techird
  * @copyright: Baidu FEX, 2014
  */
-_p[72] = {
+_p[73] = {
     value: function(require, exports, module) {
-        var kity = _p.r(37);
-        var utils = _p.r(52);
-        var Minder = _p.r(39);
-        var MinderNode = _p.r(41);
-        var Command = _p.r(29);
-        var Module = _p.r(40);
-        var Renderer = _p.r(46);
+        var kity = _p.r(38);
+        var utils = _p.r(53);
+        var Minder = _p.r(40);
+        var MinderNode = _p.r(42);
+        var Command = _p.r(30);
+        var Module = _p.r(41);
+        var Renderer = _p.r(47);
         Module.register("NoteModule", function() {
             var NOTE_PATH = "M9,9H3V8h6L9,9L9,9z M9,7H3V6h6V7z M9,5H3V4h6V5z M8.5,11H2V2h8v7.5 M9,12l2-2V1H1v11";
             /**
@@ -7282,15 +7677,15 @@ _p[72] = {
 };
 
 //lib/km-core/src/module/outline.js
-_p[73] = {
+_p[74] = {
     value: function(require, exports, module) {
-        var kity = _p.r(37);
-        var utils = _p.r(52);
-        var Minder = _p.r(39);
-        var MinderNode = _p.r(41);
-        var Command = _p.r(29);
-        var Module = _p.r(40);
-        var Renderer = _p.r(46);
+        var kity = _p.r(38);
+        var utils = _p.r(53);
+        var Minder = _p.r(40);
+        var MinderNode = _p.r(42);
+        var Command = _p.r(30);
+        var Module = _p.r(41);
+        var Renderer = _p.r(47);
         var OutlineRenderer = kity.createClass("OutlineRenderer", {
             base: Renderer,
             create: function(node) {
@@ -7378,15 +7773,15 @@ _p[73] = {
 };
 
 //lib/km-core/src/module/priority.js
-_p[74] = {
+_p[75] = {
     value: function(require, exports, module) {
-        var kity = _p.r(37);
-        var utils = _p.r(52);
-        var Minder = _p.r(39);
-        var MinderNode = _p.r(41);
-        var Command = _p.r(29);
-        var Module = _p.r(40);
-        var Renderer = _p.r(46);
+        var kity = _p.r(38);
+        var utils = _p.r(53);
+        var Minder = _p.r(40);
+        var MinderNode = _p.r(42);
+        var Command = _p.r(30);
+        var Module = _p.r(41);
+        var Renderer = _p.r(47);
         Module.register("PriorityModule", function() {
             var minder = this;
             // Designed by Akikonata
@@ -7504,15 +7899,15 @@ _p[74] = {
 };
 
 //lib/km-core/src/module/progress.js
-_p[75] = {
+_p[76] = {
     value: function(require, exports, module) {
-        var kity = _p.r(37);
-        var utils = _p.r(52);
-        var Minder = _p.r(39);
-        var MinderNode = _p.r(41);
-        var Command = _p.r(29);
-        var Module = _p.r(40);
-        var Renderer = _p.r(46);
+        var kity = _p.r(38);
+        var utils = _p.r(53);
+        var Minder = _p.r(40);
+        var MinderNode = _p.r(42);
+        var Command = _p.r(30);
+        var Module = _p.r(41);
+        var Renderer = _p.r(47);
         Module.register("ProgressModule", function() {
             var minder = this;
             var PROGRESS_DATA = "progress";
@@ -7629,15 +8024,15 @@ _p[75] = {
 };
 
 //lib/km-core/src/module/resource.js
-_p[76] = {
+_p[77] = {
     value: function(require, exports, module) {
-        var kity = _p.r(37);
-        var utils = _p.r(52);
-        var Minder = _p.r(39);
-        var MinderNode = _p.r(41);
-        var Command = _p.r(29);
-        var Module = _p.r(40);
-        var Renderer = _p.r(46);
+        var kity = _p.r(38);
+        var utils = _p.r(53);
+        var Minder = _p.r(40);
+        var MinderNode = _p.r(42);
+        var Command = _p.r(30);
+        var Module = _p.r(41);
+        var Renderer = _p.r(47);
         Module.register("Resource", function() {
             /**
          * 自动使用的颜色序列
@@ -7857,15 +8252,15 @@ _p[76] = {
 };
 
 //lib/km-core/src/module/select.js
-_p[77] = {
+_p[78] = {
     value: function(require, exports, module) {
-        var kity = _p.r(37);
-        var utils = _p.r(52);
-        var Minder = _p.r(39);
-        var MinderNode = _p.r(41);
-        var Command = _p.r(29);
-        var Module = _p.r(40);
-        var Renderer = _p.r(46);
+        var kity = _p.r(38);
+        var utils = _p.r(53);
+        var Minder = _p.r(40);
+        var MinderNode = _p.r(42);
+        var Command = _p.r(30);
+        var Module = _p.r(41);
+        var Renderer = _p.r(47);
         Module.register("Select", function() {
             var minder = this;
             var rc = minder.getRenderContainer();
@@ -8002,15 +8397,15 @@ _p[77] = {
 };
 
 //lib/km-core/src/module/style.js
-_p[78] = {
+_p[79] = {
     value: function(require, exports, module) {
-        var kity = _p.r(37);
-        var utils = _p.r(52);
-        var Minder = _p.r(39);
-        var MinderNode = _p.r(41);
-        var Command = _p.r(29);
-        var Module = _p.r(40);
-        var Renderer = _p.r(46);
+        var kity = _p.r(38);
+        var utils = _p.r(53);
+        var Minder = _p.r(40);
+        var MinderNode = _p.r(42);
+        var Command = _p.r(30);
+        var Module = _p.r(41);
+        var Renderer = _p.r(47);
         Module.register("StyleModule", function() {
             var styleNames = [ "font-size", "font-family", "font-weight", "font-style", "background", "color" ];
             var styleClipBoard = null;
@@ -8107,15 +8502,15 @@ _p[78] = {
 };
 
 //lib/km-core/src/module/text.js
-_p[79] = {
+_p[80] = {
     value: function(require, exports, module) {
-        var kity = _p.r(37);
-        var utils = _p.r(52);
-        var Minder = _p.r(39);
-        var MinderNode = _p.r(41);
-        var Command = _p.r(29);
-        var Module = _p.r(40);
-        var Renderer = _p.r(46);
+        var kity = _p.r(38);
+        var utils = _p.r(53);
+        var Minder = _p.r(40);
+        var MinderNode = _p.r(42);
+        var Command = _p.r(30);
+        var Module = _p.r(41);
+        var Renderer = _p.r(47);
         var FONT_ADJUST = {
             "微软雅黑,Microsoft YaHei": -.15,
             "arial black,avant garde": -.17,
@@ -8233,15 +8628,15 @@ _p[79] = {
 };
 
 //lib/km-core/src/module/view.js
-_p[80] = {
+_p[81] = {
     value: function(require, exports, module) {
-        var kity = _p.r(37);
-        var utils = _p.r(52);
-        var Minder = _p.r(39);
-        var MinderNode = _p.r(41);
-        var Command = _p.r(29);
-        var Module = _p.r(40);
-        var Renderer = _p.r(46);
+        var kity = _p.r(38);
+        var utils = _p.r(53);
+        var Minder = _p.r(40);
+        var MinderNode = _p.r(42);
+        var Command = _p.r(30);
+        var Module = _p.r(41);
+        var Renderer = _p.r(47);
         var ViewDragger = kity.createClass("ViewDragger", {
             constructor: function(minder) {
                 this._minder = minder;
@@ -8529,15 +8924,15 @@ _p[80] = {
 };
 
 //lib/km-core/src/module/zoom.js
-_p[81] = {
+_p[82] = {
     value: function(require, exports, module) {
-        var kity = _p.r(37);
-        var utils = _p.r(52);
-        var Minder = _p.r(39);
-        var MinderNode = _p.r(41);
-        var Command = _p.r(29);
-        var Module = _p.r(40);
-        var Renderer = _p.r(46);
+        var kity = _p.r(38);
+        var utils = _p.r(53);
+        var Minder = _p.r(40);
+        var MinderNode = _p.r(42);
+        var Command = _p.r(30);
+        var Module = _p.r(41);
+        var Renderer = _p.r(47);
         Module.register("Zoom", function() {
             var me = this;
             var timeline;
@@ -8711,9 +9106,9 @@ _p[81] = {
 };
 
 //lib/km-core/src/protocol/json.js
-_p[82] = {
+_p[83] = {
     value: function(require, exports, module) {
-        var data = _p.r(32);
+        var data = _p.r(33);
         data.registerProtocol("json", module.exports = {
             fileDescription: "KityMinder 格式",
             fileExtension: ".km",
@@ -8730,9 +9125,9 @@ _p[82] = {
 };
 
 //lib/km-core/src/protocol/markdown.js
-_p[83] = {
+_p[84] = {
     value: function(require, exports, module) {
-        var data = _p.r(32);
+        var data = _p.r(33);
         var LINE_ENDING_SPLITER = /\r\n|\r|\n/;
         var EMPTY_LINE = "";
         var NOTE_MARK_START = "<!--Note-->";
@@ -8861,11 +9256,11 @@ _p[83] = {
 };
 
 //lib/km-core/src/protocol/png.js
-_p[84] = {
+_p[85] = {
     value: function(require, exports, module) {
-        var kity = _p.r(37);
-        var data = _p.r(32);
-        var Promise = _p.r(44);
+        var kity = _p.r(38);
+        var data = _p.r(33);
+        var Promise = _p.r(45);
         var DomURL = window.URL || window.webkitURL || window;
         function loadImage(url, callback) {
             return new Promise(function(resolve, reject) {
@@ -8975,9 +9370,9 @@ _p[84] = {
 };
 
 //lib/km-core/src/protocol/svg.js
-_p[85] = {
+_p[86] = {
     value: function(require, exports, module) {
-        var data = _p.r(32);
+        var data = _p.r(33);
         data.registerProtocol("svg", module.exports = {
             fileDescription: "SVG 矢量图",
             fileExtension: ".svg",
@@ -9009,9 +9404,9 @@ _p[85] = {
 };
 
 //lib/km-core/src/protocol/text.js
-_p[86] = {
+_p[87] = {
     value: function(require, exports, module) {
-        var data = _p.r(32);
+        var data = _p.r(33);
         var LINE_ENDING = "\r", LINE_ENDING_SPLITER = /\r\n|\r|\n/, TAB_CHAR = "	";
         function repeat(s, n) {
             var result = "";
@@ -9095,9 +9490,9 @@ _p[86] = {
  * @author: techird
  * @copyright: Baidu FEX, 2014
  */
-_p[87] = {
+_p[88] = {
     value: function(require, exports, module) {
-        var template = _p.r(50);
+        var template = _p.r(51);
         template.register("default", {
             getLayout: function(node) {
                 if (node.getData("layout")) return node.getData("layout");
@@ -9129,9 +9524,9 @@ _p[87] = {
  * @author: techird
  * @copyright: Baidu FEX, 2014
  */
-_p[88] = {
+_p[89] = {
     value: function(require, exports, module) {
-        var template = _p.r(50);
+        var template = _p.r(51);
         template.register("filetree", {
             getLayout: function(node) {
                 if (node.getData("layout")) return node.getData("layout");
@@ -9157,9 +9552,9 @@ _p[88] = {
  * @author: techird
  * @copyright: Baidu FEX, 2014
  */
-_p[89] = {
+_p[90] = {
     value: function(require, exports, module) {
-        var template = _p.r(50);
+        var template = _p.r(51);
         template.register("fish-bone", {
             getLayout: function(node) {
                 if (node.getData("layout")) return node.getData("layout");
@@ -9199,9 +9594,9 @@ _p[89] = {
  * @author: techird
  * @copyright: Baidu FEX, 2014
  */
-_p[90] = {
+_p[91] = {
     value: function(require, exports, module) {
-        var template = _p.r(50);
+        var template = _p.r(51);
         template.register("right", {
             getLayout: function(node) {
                 return node.getData("layout") || "right";
@@ -9223,9 +9618,9 @@ _p[90] = {
  * @author: techird
  * @copyright: Baidu FEX, 2014
  */
-_p[91] = {
+_p[92] = {
     value: function(require, exports, module) {
-        var template = _p.r(50);
+        var template = _p.r(51);
         template.register("structure", {
             getLayout: function(node) {
                 return node.getData("layout") || "bottom";
@@ -9238,9 +9633,9 @@ _p[91] = {
 };
 
 //lib/km-core/src/theme/default.js
-_p[92] = {
+_p[93] = {
     value: function(require, exports, module) {
-        var theme = _p.r(51);
+        var theme = _p.r(52);
         [ "classic", "classic-compact" ].forEach(function(name) {
             var compact = name == "classic-compact";
             /* jscs:disable maximumLineLength */
@@ -9297,9 +9692,9 @@ _p[92] = {
 };
 
 //lib/km-core/src/theme/fish.js
-_p[93] = {
+_p[94] = {
     value: function(require, exports, module) {
-        var theme = _p.r(51);
+        var theme = _p.r(52);
         theme.register("fish", {
             background: "#3A4144 url(ui/theme/default/images/grid.png) repeat",
             "root-color": "#430",
@@ -9348,10 +9743,10 @@ _p[93] = {
 };
 
 //lib/km-core/src/theme/fresh.js
-_p[94] = {
+_p[95] = {
     value: function(require, exports, module) {
-        var kity = _p.r(37);
-        var theme = _p.r(51);
+        var kity = _p.r(38);
+        var theme = _p.r(52);
         function hsl(h, s, l) {
             return kity.Color.createHSL(h, s, l);
         }
@@ -9417,9 +9812,9 @@ _p[94] = {
 };
 
 //lib/km-core/src/theme/snow.js
-_p[95] = {
+_p[96] = {
     value: function(require, exports, module) {
-        var theme = _p.r(51);
+        var theme = _p.r(52);
         [ "snow", "snow-compact" ].forEach(function(name) {
             var compact = name == "snow-compact";
             /* jscs:disable maximumLineLength */
@@ -9472,9 +9867,9 @@ _p[95] = {
 };
 
 //lib/km-core/src/theme/wire.js
-_p[96] = {
+_p[97] = {
     value: function(require, exports, module) {
-        var theme = _p.r(51);
+        var theme = _p.r(52);
         theme.register("wire", {
             background: "black",
             color: "#999",

@@ -25,6 +25,7 @@ define(function(require, exports, module) {
 
         // 导出给其它 Runtime 使用
         this.minder = minder;
+		
     }
 
     return module.exports = MinderRuntime;
