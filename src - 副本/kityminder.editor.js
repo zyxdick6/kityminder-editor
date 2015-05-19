@@ -9428,13 +9428,13 @@ _p[83] = {
         var Module = _p.r(45);
         var Renderer = _p.r(52);
         /**
-     * @command AppendChildNode
-     * @description 添加子节点到选中的节点中
-     * @param {string|object} textOrData 要插入的节点的文本或数据
-     * @state
-     *    0: 当前有选中的节点
-     *   -1: 当前没有选中的节点
-     */
+	 * @command AppendChildNode
+	 * @description 添加子节点到选中的节点中
+	 * @param {string|object} textOrData 要插入的节点的文本或数据
+	 * @state
+	 *    0: 当前有选中的节点
+	 *   -1: 当前没有选中的节点
+	 */
         var AppendChildCommand = kity.createClass("AppendChildCommand", {
             base: Command,
             execute: function(km, text) {
@@ -9446,12 +9446,7 @@ _p[83] = {
                 parent.expand();
                 var node = km.createNode(text, parent);
                 km.select(node, true);
-                if (parent.isExpanded()) {
-                    node.render();
-                } else {
-                    parent.expand();
-                    parent.renderTree();
-                }
+                node.render();
                 km.layout(600);
             },
             queryState: function(km) {
@@ -9460,13 +9455,13 @@ _p[83] = {
             }
         });
         /**
-     * @command AppendSiblingNode
-     * @description 添加选中的节点的兄弟节点
-     * @param {string|object} textOrData 要添加的节点的文本或数据
-     * @state
-     *    0: 当前有选中的节点
-     *   -1: 当前没有选中的节点
-     */
+	 * @command AppendSiblingNode
+	 * @description 添加选中的节点的兄弟节点
+	 * @param {string|object} textOrData 要添加的节点的文本或数据
+	 * @state
+	 *    0: 当前有选中的节点
+	 *   -1: 当前没有选中的节点
+	 */
         var AppendSiblingCommand = kity.createClass("AppendSiblingCommand", {
             base: Command,
             execute: function(km, text) {
@@ -9488,12 +9483,12 @@ _p[83] = {
             }
         });
         /**
-     * @command RemoveNode
-     * @description 移除选中的节点
-     * @state
-     *    0: 当前有选中的节点
-     *   -1: 当前没有选中的节点
-     */
+	 * @command RemoveNode
+	 * @description 移除选中的节点
+	 * @state
+	 *    0: 当前有选中的节点
+	 *   -1: 当前没有选中的节点
+	 */
         var RemoveNodeCommand = kity.createClass("RemoverNodeCommand", {
             base: Command,
             execute: function(km) {
@@ -9543,18 +9538,41 @@ _p[83] = {
                 return 0;
             }
         });
+        var EditNodeCommand = kity.createClass("EditNodeCommand", {
+            base: Command,
+            execute: function(km) {
+                var selectedNode = km.getSelectedNode();
+                if (!selectedNode) {
+                    return null;
+                }
+                km.select(selectedNode, true);
+                km.textEditNode(selectedNode);
+            },
+            queryState: function(km) {
+                var selectedNode = km.getSelectedNode();
+                if (!selectedNode) {
+                    return -1;
+                } else {
+                    return 0;
+                }
+            },
+            isNeedUndo: function() {
+                return false;
+            }
+        });
         Module.register("NodeModule", function() {
             return {
                 commands: {
                     AppendChildNode: AppendChildCommand,
                     AppendSiblingNode: AppendSiblingCommand,
                     RemoveNode: RemoveNodeCommand,
-                    AppendParentNode: AppendParentCommand
+                    EditNode: EditNodeCommand
                 },
                 commandShortcutKeys: {
                     appendsiblingnode: "normal::Enter",
                     appendchildnode: "normal::Insert|Tab",
                     appendparentnode: "normal::Shift+Tab|normal::Shift+Insert",
+                    editnode: "normal::F2",
                     removenode: "normal::Del|Backspace"
                 }
             };
@@ -10458,10 +10476,7 @@ _p[90] = {
                             lastDownPosition = e.getPosition();
                         }
                     },
-                    mousemove: function(e) {
-                        console.log("fuck~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~");
-                        marqueeActivator.selectMove(e);
-                    },
+                    mousemove: marqueeActivator.selectMove,
                     mouseup: function(e) {
                         var upNode = e.getTargetNode();
                         // 如果 mouseup 发生在 lastDownNode 外，是无需理会的

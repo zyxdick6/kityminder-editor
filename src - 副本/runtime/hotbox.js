@@ -28,20 +28,6 @@ define(function(require, exports, module) {
                 };
             }
             hotbox.active('main', position);
-			minder.setStatus('hotbox');
-        });
-		fsm.when('inputready -> hotbox', function(exit, enter, reason) {
-            var node = minder.getSelectedNode();
-            var position;
-            if (node) {
-                var box = node.getRenderBox();
-                position = {
-                    x: box.cx,
-                    y: box.cy
-                };
-            }
-            hotbox.active('main', position);
-			minder.setStatus('hotbox');
         });
 
         fsm.when('normal -> normal', function(exit, enter, reason, e) {

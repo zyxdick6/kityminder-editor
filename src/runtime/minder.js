@@ -6,27 +6,35 @@
  * @author: techird
  * @copyright: Baidu FEX, 2014
  */
-define(function(require, exports, module) {
-    var Minder = require('../minder');
+define(function (require, exports, module) {
+	var Minder = require('../minder');
 
-    function MinderRuntime() {
+	function MinderRuntime() {
 
-        // 不使用 kityminder 的按键处理，由 ReceiverRuntime 统一处理
-        var minder = new Minder({
-            enableKeyReceiver: false,
-            enableAnimation: false
-        });
+		//初始化配置
+		var default_option = {
+			minder : {
+				enableKeyReceiver : false,
+				enableAnimation : true,
+			}
 
-        // 渲染，初始化
-        minder.renderTo(this.selector);
-        minder.setTheme(null);
-        minder.select(minder.getRoot(), true);
-        minder.execCommand('text', '中心主题');
+		}
+		var options = $.extend(true, default_option, this.option.minder)
 
-        // 导出给其它 Runtime 使用
-        this.minder = minder;
-		
-    }
+			// 不使用 kityminder 的按键处理，由 ReceiverRuntime 统一处理
+			var minder = new Minder(options);
 
-    return module.exports = MinderRuntime;
+		// 渲染，初始化
+		minder.renderTo(this.selector);
+		minder.setTheme(null);
+		minder.setTemplate(options.defaultTemplate);
+		minder.select(minder.getRoot(), true);
+		minder.execCommand('text', this.option.defaultText || '中心主题');
+
+		// 导出给其它 Runtime 使用
+		this.minder = minder;
+
+	}
+
+	return module.exports = MinderRuntime;
 });

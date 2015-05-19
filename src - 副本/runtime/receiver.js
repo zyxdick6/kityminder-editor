@@ -15,11 +15,11 @@ define(function(require, exports, module) {
         var minder = this.minder;
 
         // 接收事件的 div
-        var element = $('.km_receiver')[0];
+        var element = document.createElement('div');
         element.contentEditable = true;
-        //element.classList.add('receiver');
+        element.classList.add('receiver');
         element.onkeydown = element.onkeypress = element.onkeyup = dispatchKeyEvent;
-        //this.container.appendChild(element);
+        this.container.appendChild(element);
 
         // receiver 对象
         var receiver = {

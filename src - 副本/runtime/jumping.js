@@ -40,24 +40,17 @@ define(function(require, exports, module) {
                 e.preventDefault();
                 return fsm.jump('hotbox', 'space-trigger');
             }
-            // // normal -> input
-            // if (e.type == 'keydown' && isIntendToInput(e)) {
-                // if (minder.getSelectedNode()) {
-                    // return fsm.jump('input', 'user-input');
-                // } else {
-                    // receiverElement.innerHTML = '';
-                // }
-            // }
+            // normal -> input
+            if (e.type == 'keydown' && isIntendToInput(e)) {
+                if (minder.getSelectedNode()) {
+                    return fsm.jump('input', 'user-input');
+                } else {
+                    receiverElement.innerHTML = '';
+                }
+            }
             // normal -> normal
-            //if (e.type == 'keydown') {
-            //    return fsm.jump('normal', 'shortcut-handle', e);
-            //}
-        });
-		receiver.listen('inputready', function(e) {
-            // normal -> hotbox
-            if (e.type == 'keydown' && e.is('Space')) {
-                e.preventDefault();
-                return fsm.jump('hotbox', 'space-trigger');
+            if (e.type == 'keydown') {
+                return fsm.jump('normal', 'shortcut-handle', e);
             }
         });
 
@@ -70,22 +63,22 @@ define(function(require, exports, module) {
             }
         });
 
-        // // input => normal
-        // receiver.listen('input', function(e) {
-            // if (e.type == 'keydown') {
-                // if (e.is('Enter')) {
-                    // e.preventDefault();
-                    // return fsm.jump('normal', 'input-commit');
-                // }
-                // if (e.is('Esc')) {
-                    // e.preventDefault();
-                    // return fsm.jump('normal', 'input-cancel');
-                // }
-                // if (e.is('Tab') || e.is('Shift + Tab')) {
-                    // e.preventDefault();
-                // }
-            // }
-        // });
+        // input => normal
+        receiver.listen('input', function(e) {
+            if (e.type == 'keydown') {
+                if (e.is('Enter')) {
+                    e.preventDefault();
+                    return fsm.jump('normal', 'input-commit');
+                }
+                if (e.is('Esc')) {
+                    e.preventDefault();
+                    return fsm.jump('normal', 'input-cancel');
+                }
+                if (e.is('Tab') || e.is('Shift + Tab')) {
+                    e.preventDefault();
+                }
+            }
+        });
 
 
         //////////////////////////////////////////////
@@ -99,20 +92,14 @@ define(function(require, exports, module) {
             if (fsm.state() == 'hotbox') {
                 hotbox.active(Hotbox.STATE_IDLE);
                 fsm.jump('normal', 'blur');
-            } else if ((fsm.state() == 'normal'||fsm.state() == 'inputready')) {
-				if( e.button == MOUSE_RB){
-					downX = e.clientX;
-					downY = e.clientY;
-				}
-                if(hotbox.state() != Hotbox.STATE_IDLE){
-					hotbox.active(Hotbox.STATE_IDLE);
-					fsm.jump('normal', 'blur');
-				}
+            } else if (fsm.state() == 'normal' && e.button == MOUSE_RB) {
+                downX = e.clientX;
+                downY = e.clientY;
             }
         }, false);
 
         container.addEventListener('mouseup', function(e) {
-            if ((fsm.state() != 'normal'&&fsm.state() != 'inputready')) {
+            if (fsm.state() != 'normal') {
                 return;
             }
             if (e.button != MOUSE_RB || e.clientX != downX || e.clientY != downY) {
@@ -127,10 +114,6 @@ define(function(require, exports, module) {
         // 阻止热盒事件冒泡，在热盒正确执行前导致热盒关闭
         hotbox.$element.addEventListener('mousedown', function(e) {
             e.stopPropagation();
-        });
-		// 阻止热盒事件冒泡，在热盒正确执行前导致热盒关闭
-        hotbox.$element.addEventListener('contextmenu', function(e) {
-            e.preventDefault();
         });
     }
 
